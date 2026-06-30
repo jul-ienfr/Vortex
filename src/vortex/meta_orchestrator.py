@@ -77,7 +77,7 @@ class MetaOrchestrator:
             "metrics": context.get("current_metrics", {}),
             "baseline": context.get("baseline_metrics", {}),
             "history": self.history.get_recent(5),
-            "skills": [s.name for s in self.skills.get_top_skills(5)],
+            "skills": [s.name for s in self.skills.list_skills()[:5]],
             "project_files": self._list_project_files(),
         }
 
@@ -177,11 +177,15 @@ Donne ton avis en 2-3 phrases. Sois spécifique et actionnable."""
 
     def _organize_debats(self, questions: list[str]) -> list:
         """Organise des débats pour chaque question."""
+        from vortex.debate import DebateEngine
+
         debates = []
         for question in questions:
             method = self._choose_debate_method(question)
-            team = self.debate_engine.create_team(3)
-            result = self.debate_engine.debate(question, team, method=method)
+            # Créer un nouvel engine avec la méthode choisie
+            engine = DebateEngine(method, models=['mimo-v2.5', 'deepseek-v4-flash'])
+            team = engine.create_team(3)
+            result = engine.debate(question, team)
             debates.append(result)
         return debates
 
