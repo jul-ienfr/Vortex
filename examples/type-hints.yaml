@@ -1,0 +1,25 @@
+name: type-hints
+description: "Add type hints to Python code"
+project_path: /path/to/project
+metrics:
+  - name: typed_functions
+    source: "python3 -c \"import ast; funcs=[n for f in __import__('pathlib').Path('.').rglob('*.py') for n in ast.walk(ast.parse(f.read())) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))]; typed=sum(1 for f in funcs if f.returns is not None); print(f'{typed}/{len(funcs)}')\" 2>/dev/null | awk -F/ '{print $1/$2*100}'"
+    direction: up
+    weight: 2.0
+  - name: mypy_errors
+    source: "mypy src/ --ignore-missing-imports 2>/dev/null | grep -c 'error:'"
+    direction: down
+    weight: 3.0
+  - name: untyped_vars
+    source: "grep -r ': None\\|= None' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 1.0
+constraints:
+  - "Don't change function behavior"
+  - "Keep backward compatibility"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 3
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
