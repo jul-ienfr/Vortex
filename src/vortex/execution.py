@@ -65,10 +65,33 @@ class HypothesisGenerator:
 
     def generate(self, context: dict) -> list[Change]:
         """Generate hypotheses based on current context."""
-        # For now, return empty list — LLM integration comes later
-        # The actual generation will use litellm to call Claude/Codex
-        logger.info("Generating hypotheses (stub — LLM integration pending)")
-        return []
+        try:
+            import litellm
+            prompt = self._build_prompt(context)
+            model = self.manifest.optimizer.model or "mimo-v2.5"
+            # For OpenAI-compatible proxies, prefix with openai/
+            if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
+                model = f"openai/{model}"
+
+            # Build kwargs for litellm
+            kwargs = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 1000,
+            }
+
+            # Add proxy if configured (OpenAI-compatible endpoint)
+            if self.manifest.optimizer.model_proxy:
+                kwargs["api_base"] = self.manifest.optimizer.model_proxy
+
+            response = litellm.completion(**kwargs)
+
+            content = response.choices[0].message.content
+            return self._parse_response(content)
+        except Exception as e:
+            logger.warning("LLM hypothesis generation failed: %s", e)
+            return []
 
     def _build_prompt(self, context: dict) -> str:
         """Build the optimization prompt."""
@@ -88,6 +111,26 @@ Generate up to {self.manifest.optimizer.max_changes_per_cycle} specific, actiona
 For each change, specify: file, description, rationale.
 
 Output as JSON: {{"changes": [{{"file": "...", "description": "...", "rationale": "..."}}]}}"""
+
+    def _parse_response(self, content: str) -> list[Change]:
+        """Parse LLM response into Change objects."""
+        try:
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+                changes = []
+                for c in data.get("changes", [])[:self.manifest.optimizer.max_changes_per_cycle]:
+                    changes.append(Change(
+                        file=c.get("file", ""),
+                        description=c.get("description", ""),
+                        rationale=c.get("rationale", ""),
+                    ))
+                return changes
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning("Failed to parse LLM response: %s", e)
+        return []
 
 
 class ExecutionEngine:

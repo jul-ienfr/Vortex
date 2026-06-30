@@ -1,0 +1,39 @@
+name: vortex-self-optimize
+description: "VORTEX optimizes itself - full loop test"
+project_path: /home/jul/projects/vortex
+metrics:
+  - name: test_count
+    source: ".venv/bin/python -m pytest tests/ --co -q 2>/dev/null | grep -oP '\\d+(?= tests)'"
+    direction: up
+    weight: 3.0
+  - name: source_modules
+    source: "find src/vortex -name '*.py' | wc -l"
+    direction: up
+    weight: 1.5
+  - name: lint_issues
+    source: ".venv/bin/python -m ruff check src/ 2>/dev/null | wc -l"
+    direction: down
+    weight: 2.0
+  - name: source_lines
+    source: "cat src/vortex/*.py | wc -l"
+    direction: up
+    weight: 1.0
+constraints:
+  - "Don't break existing tests"
+  - "Maintain backward compatibility"
+  - "Keep all 132 tests passing"
+  - "Max 2 files modified per cycle"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  rollback_on_regression: true
+  debate_enabled: true
+  debate_method: standard
+  debate_rounds: 3
+  model: mimo-v2.5
+  model_proxy: http://192.168.31.59:4000/v1
+  self_improve_enabled: false
+  skill_library_enabled: true
+  convergence_stagnation_limit: 5
+  convergence_min_cycles: 2
+  budget_limit_usd: 2.0
