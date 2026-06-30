@@ -1,0 +1,22 @@
+services:
+  vortex:
+    build: .
+    volumes:
+      - ./projects:/projects
+      - vortex-data:/data
+    environment:
+      - VORTEX_API_KEY=${VORTEX_API_KEY:-}
+      - VORTEX_MODEL=${VORTEX_MODEL:-claude-sonnet-4-6}
+    command: vortex --help
+
+  sandbox:
+    image: python:3.12-slim
+    read_only: true
+    tmpfs:
+      - /tmp:size=10m
+    mem_limit: 256m
+    cpus: 1.0
+    network_mode: none
+
+volumes:
+  vortex-data:
