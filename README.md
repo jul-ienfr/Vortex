@@ -1,5 +1,10 @@
 # VORTEX
 
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Tests](https://img.shields.io/badge/tests-132%20passing-brightgreen.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![GitHub](https://img.shields.io/github/stars/jul-ienfr/Vortex)
+
 **Manifest-driven self-improving optimization engine.**
 
 VORTEX optimizes any project using YAML manifests — and can optimize itself.

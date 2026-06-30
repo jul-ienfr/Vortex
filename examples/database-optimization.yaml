@@ -1,0 +1,27 @@
+name: database-optimization
+description: "Optimize database queries and schema"
+project_path: /path/to/project
+metrics:
+  - name: slow_queries
+    source: "python3 -c \"import sqlite3; conn=sqlite3.connect('app.db'); cursor=conn.execute('SELECT count(*) FROM sqlite_stat WHERE idx_scan=0'); print(cursor.fetchone()[0])\""
+    direction: down
+    weight: 3.0
+  - name: index_coverage
+    source: "python3 -c \"import sqlite3; conn=sqlite3.connect('app.db'); tables=conn.execute('SELECT name FROM sqlite_master WHERE type=\"table\"').fetchall(); indexed=sum(1 for t in tables if conn.execute(f'SELECT count(*) FROM sqlite_master WHERE type=\"index\" AND tbl_name=\"{t[0]}\"').fetchone()[0]>0); print(f'{indexed}/{len(tables)}')\" 2>/dev/null | awk -F/ '{print $1/$2*100}'"
+    direction: up
+    weight: 2.0
+  - name: db_size_mb
+    source: "du -m app.db 2>/dev/null | awk '{print $1}'"
+    direction: down
+    weight: 1.5
+constraints:
+  - "Don't drop existing tables"
+  - "Keep data integrity"
+  - "Test migrations before applying"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 1
+  debate_enabled: true
+  debate_method: premortem
+  model: claude-sonnet-4-6
+  budget_limit_usd: 5.0
