@@ -101,17 +101,16 @@ class TreeSearch:
         """Generate child nodes via mutation and recombination."""
         children = []
 
-        # Mutation: add a new change
-        for _ in range(self.branching_factor):
+        # Mutation: use LLM to generate a real change
+        for i in range(self.branching_factor):
             child = TreeNode(
                 changes=node.changes.copy(),
                 depth=node.depth + 1,
             )
-            # Add a random change (placeholder — real impl uses LLM)
-            child.changes.append({
-                "file": f"file_{random.randint(0, 100)}.py",
-                "description": f"Optimization at depth {child.depth}",
-            })
+            # Generate a real change via LLM
+            change = self._generate_change_via_llm(node, context, i)
+            if change:
+                child.changes.append(change)
             children.append(child)
 
         # Recombination from archive (if available)
@@ -121,6 +120,57 @@ class TreeSearch:
             children.append(recombined)
 
         return children
+
+    def _generate_change_via_llm(self, node: TreeNode, context: dict, variation: int) -> dict | None:
+        """Generate a real change via LLM."""
+        try:
+            import litellm
+            import os
+            import json
+
+            existing = [c.get("description", "") for c in node.changes]
+            metrics = context.get("metrics", {})
+
+            prompt = f"""You are an optimization engine. Generate ONE specific code change.
+
+Current metrics: {json.dumps(metrics)}
+Existing changes: {existing}
+Variation: {variation}
+
+Output ONLY a JSON object: {{"file": "path/to/file.py", "description": "specific change"}}
+Be specific about the file path and the change."""
+
+            model = "openai/mimo-v2.5"
+            kwargs = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.8,
+                "max_tokens": 256,
+            }
+            kwargs["api_base"] = "http://192.168.31.59:4000/v1"
+            if not os.environ.get("OPENAI_API_KEY"):
+                kwargs["api_key"] = "not-needed"
+
+            response = litellm.completion(**kwargs)
+            msg = response.choices[0].message
+            content = msg.content or ""
+            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
+                content = msg.reasoning_content
+            if not content:
+                fields = getattr(msg, 'provider_specific_fields', {})
+                details = fields.get('reasoning_details', [])
+                if details:
+                    content = details[0].get('text', '')
+
+            # Parse JSON from response
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+                return {"file": data.get("file", ""), "description": data.get("description", "")}
+        except Exception as e:
+            logger.warning("LLM change generation failed: %s", e)
+        return None
 
     def _evaluate(self, node: TreeNode, context: dict) -> float:
         """Heuristic evaluation of a node."""

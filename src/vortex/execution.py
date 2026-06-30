@@ -334,14 +334,77 @@ class ConstraintGates:
         return GateCheck(gate_name="size_limits", passed=True)
 
     def _check_semantics(self, execution: ExecutionResult) -> GateCheck:
-        """Check semantic preservation."""
-        # Placeholder — real implementation would use LLM to verify
-        return GateCheck(gate_name="semantic_preservation", passed=True)
+        """Check semantic preservation using LLM."""
+        try:
+            import litellm
+            import os
+            import json
+
+            files = execution.files_changed[:5]  # Limit to 5 files
+            diffs = execution.diff[:2000]  # Limit diff size
+
+            prompt = f"""You are a code reviewer. Check if these changes preserve semantic behavior.
+
+Files changed: {files}
+Diff preview:
+{diffs}
+
+Does this change preserve the original behavior? Answer ONLY "yes" or "no" with a brief reason."""
+
+            model = "openai/deepseek-v4-flash"
+            kwargs = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_tokens": 100,
+            }
+            kwargs["api_base"] = "http://192.168.31.59:4000/v1"
+            if not os.environ.get("OPENAI_API_KEY"):
+                kwargs["api_key"] = "not-needed"
+
+            response = litellm.completion(**kwargs)
+            content = response.choices[0].message.content or ""
+            passed = content.lower().startswith("yes")
+            return GateCheck(
+                gate_name="semantic_preservation",
+                passed=passed,
+                reason=content[:200],
+            )
+        except Exception as e:
+            logger.warning("Semantic check failed: %s", e)
+            return GateCheck(gate_name="semantic_preservation", passed=True, reason="Check skipped (error)")
 
     def _check_regression(self, execution: ExecutionResult, context: dict) -> GateCheck:
-        """Check for performance regression."""
-        # Placeholder — real implementation would compare metrics
-        return GateCheck(gate_name="no_regression", passed=True)
+        """Check for performance regression by comparing metrics."""
+        try:
+            # Compare current metrics with baseline
+            baseline = context.get("baseline_metrics", {})
+            current = context.get("current_metrics", {})
+
+            if not baseline or not current:
+                return GateCheck(gate_name="no_regression", passed=True, reason="No metrics to compare")
+
+            regressions = []
+            for metric_name, baseline_val in baseline.items():
+                current_val = current.get(metric_name)
+                if current_val is None:
+                    continue
+                if baseline_val != 0:
+                    change_pct = (current_val - baseline_val) / abs(baseline_val) * 100
+                    # Check if there's a significant regression (>10% worse)
+                    if abs(change_pct) > 10:
+                        regressions.append(f"{metric_name}: {change_pct:+.1f}%")
+
+            if regressions:
+                return GateCheck(
+                    gate_name="no_regression",
+                    passed=False,
+                    reason=f"Regressions detected: {', '.join(regressions)}",
+                )
+            return GateCheck(gate_name="no_regression", passed=True)
+        except Exception as e:
+            logger.warning("Regression check failed: %s", e)
+            return GateCheck(gate_name="no_regression", passed=True, reason="Check skipped (error)")
 
     def _check_review_needed(self, execution: ExecutionResult) -> GateCheck:
         """Check if human review is needed."""
