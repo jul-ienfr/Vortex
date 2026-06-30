@@ -228,9 +228,15 @@ class ExecutionEngine:
                 else:  # modify - use LLM to apply the change
                     original = file_path.read_text()
                     new_content = self._apply_change_with_llm(original, change)
+                    # VALIDATE: only apply if valid Python AND not too different
                     if new_content and new_content != original:
-                        file_path.write_text(new_content)
-                        files_changed.append(change.file)
+                        if not self._validate_python(new_content):
+                            logger.warning("LLM produced invalid Python for %s, skipping", change.file)
+                        elif self._is_too_different(original, new_content):
+                            logger.warning("LLM changed too much in %s (>30%%), skipping", change.file)
+                        else:
+                            file_path.write_text(new_content)
+                            files_changed.append(change.file)
 
             # Capture diff
             diff_result = subprocess.run(
@@ -256,6 +262,26 @@ class ExecutionEngine:
                 duration_ms=duration_ms,
             )
 
+
+    def _validate_python(self, code: str) -> bool:
+        """Validate that code is valid Python syntax."""
+        try:
+            compile(code, '<string>', 'exec')
+            return True
+        except SyntaxError:
+            return False
+
+    def _is_too_different(self, original: str, new: str, threshold: float = 0.3) -> bool:
+        """Check if new content is too different from original (>30% change)."""
+        if not original:
+            return False
+        # Simple line-by-line comparison
+        orig_lines = set(original.splitlines())
+        new_lines = set(new.splitlines())
+        if not orig_lines:
+            return False
+        changed = len(orig_lines.symmetric_difference(new_lines))
+        return changed / len(orig_lines) > threshold
 
     def _generate_file_content(self, change: Change) -> str:
         """Use LLM to generate file content."""
