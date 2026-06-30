@@ -1,0 +1,25 @@
+name: error-handling
+description: "Improve error handling patterns"
+project_path: /path/to/project
+metrics:
+  - name: bare_excepts
+    source: "grep -r 'except:' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 3.0
+  - name: broad_excepts
+    source: "grep -r 'except Exception' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 2.0
+  - name: print_statements
+    source: "grep -r 'print(' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 1.5
+constraints:
+  - "Don't break existing functionality"
+  - "Keep error messages informative"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
