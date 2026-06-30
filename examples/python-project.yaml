@@ -1,0 +1,26 @@
+name: python-quality
+description: "Improve Python project quality"
+project_path: /path/to/python/project
+metrics:
+  - name: test_count
+    source: "python3 -m pytest tests/ --co -q 2>/dev/null | tail -1 | grep -oP '\\d+'"
+    direction: up
+    weight: 2.0
+  - name: lint_issues
+    source: "ruff check src/ 2>/dev/null | wc -l"
+    direction: down
+    weight: 1.5
+  - name: type_coverage
+    source: "mypy src/ --ignore-missing-imports 2>/dev/null | grep 'Success' | wc -l"
+    direction: up
+    weight: 1.0
+constraints:
+  - "Don't break existing tests"
+  - "Maintain API compatibility"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
+  convergence_stagnation_limit: 8

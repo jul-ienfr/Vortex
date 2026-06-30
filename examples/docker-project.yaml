@@ -1,0 +1,22 @@
+name: docker-optimization
+description: "Optimize Docker image size and build speed"
+project_path: /path/to/docker/project
+metrics:
+  - name: image_size_mb
+    source: "docker images myapp:latest --format '{{.Size}}' | awk '{print $1}'"
+    direction: down
+    weight: 2.0
+  - name: build_time_seconds
+    source: "time docker build -t myapp:test . 2>&1 | grep real | awk '{print $2}'"
+    direction: down
+    weight: 1.5
+constraints:
+  - "Keep all required functionality"
+  - "Don't remove health checks"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 1
+  debate_enabled: true
+  debate_method: premortem
+  model: claude-sonnet-4-6
+  budget_limit_usd: 5.0
