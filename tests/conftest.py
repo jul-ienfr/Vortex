@@ -14,7 +14,7 @@ def pytest_configure(config):
     config.addinivalue_line("python_files", "test_*.py")
     config.addinivalue_line("python_classes", "Test*")
     config.addinivalue_line("python_functions", "test_*")
-    config.addinivalue_line("addopts", "--tb=short -q")
+    config.addinivalue_line("addopts", "--tb=short -q --count=132")
 
 
 @pytest.fixture
