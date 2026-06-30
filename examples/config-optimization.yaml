@@ -1,0 +1,25 @@
+name: config-optimization
+description: "Optimize application configuration"
+project_path: /path/to/project
+metrics:
+  - name: config_size_lines
+    source: "wc -l config.yaml 2>/dev/null | awk '{print $1}'"
+    direction: down
+    weight: 1.0
+  - name: config_depth
+    source: "python3 -c \"import yaml; d=yaml.safe_load(open('config.yaml')); def depth(d,c=0): return max((depth(v,c+1) for v in d.values() if isinstance(v,dict)), default=c) if isinstance(d,dict) else c; print(depth(d))\" 2>/dev/null"
+    direction: down
+    weight: 1.5
+  - name: deprecated_keys
+    source: "grep -c 'deprecated\\|old\\|legacy' config.yaml 2>/dev/null || echo 0"
+    direction: down
+    weight: 2.0
+constraints:
+  - "Keep all required configuration"
+  - "Don't remove environment-specific settings"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
