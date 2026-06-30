@@ -1,0 +1,26 @@
+name: resell
+description: "Optimiser les ventes Leboncoin"
+project_path: /home/jul/projects/Panier
+metrics:
+  - name: marge_moyenne
+    source: "echo 12.5"
+    direction: up
+    weight: 2.0
+  - name: vitesse_vente_jours
+    source: "echo 7.2"
+    direction: down
+    weight: 1.5
+  - name: nb_annonces_actives
+    source: "echo 15"
+    direction: up
+    weight: 1.0
+constraints:
+  - "Ne pas modifier les prix existants sans validation"
+  - "Garder les catégories actives"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 3
+  rollback_on_regression: true
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
