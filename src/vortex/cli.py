@@ -44,6 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     # vortex status
     subparsers.add_parser("status", help="Show status")
 
+    # vortex serve
+    serve_parser = subparsers.add_parser("serve", help="Start web server")
+    serve_parser.add_argument("--host", type=str, default="0.0.0.0")
+    serve_parser.add_argument("--port", type=int, default=8080)
+
     # vortex hooks
     hooks_parser = subparsers.add_parser("hooks", help="Manage hooks")
     hooks_sub = hooks_parser.add_subparsers(dest="hooks_command")
@@ -81,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_hooks(args)
     elif args.command == "skills":
         return _cmd_skills(args)
+    elif args.command == "serve":
+        return _cmd_serve(args)
 
     parser.print_help()
     return 0
@@ -186,6 +193,15 @@ def _cmd_skills(args: argparse.Namespace) -> int:
     elif args.skills_command == "create":
         skill = lib.create_skill(args.name, args.description, "template")
         print(f"Created skill: {skill.name} ({skill.id})")
+    return 0
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    """Execute the serve command."""
+    from vortex.server import run_server
+
+    print(f"Starting VORTEX server on http://{args.host}:{args.port}")
+    run_server(host=args.host, port=args.port)
     return 0
 
 
