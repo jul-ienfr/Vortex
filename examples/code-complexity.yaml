@@ -1,0 +1,25 @@
+name: code-complexity
+description: "Reduce code complexity"
+project_path: /path/to/project
+metrics:
+  - name: long_functions
+    source: "python3 -c \"import ast; funcs=[n for f in __import__('pathlib').Path('.').rglob('*.py') for n in ast.walk(ast.parse(f.read())) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and hasattr(n,'end_lineno') and n.end_lineno and n.end_lineno-n.lineno>50]; print(len(funcs))\""
+    direction: down
+    weight: 2.0
+  - name: nested_depth
+    source: "python3 -c \"import ast; max_depth=0; [max_depth := max(max_depth, d) for f in __import__('pathlib').Path('.').rglob('*.py') for n in ast.walk(ast.parse(f.read())) if isinstance(n,ast.For) for d in [len([a for a in ast.walk(n) if isinstance(a,(ast.For,ast.If))])] ]; print(max_depth)\""
+    direction: down
+    weight: 1.5
+  - name: duplicate_code
+    source: "python3 -c \"import hashlib; files=[(f,hashlib.md5(f.read_bytes()).hexdigest()) for f in __import__('pathlib').Path('.').rglob('*.py') if f.is_file()]; dupes=len(files)-len(set(h for _,h in files)); print(dupes)\""
+    direction: down
+    weight: 1.0
+constraints:
+  - "Don't change public API"
+  - "Keep backward compatibility"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6

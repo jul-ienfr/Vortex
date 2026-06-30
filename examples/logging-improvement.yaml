@@ -1,0 +1,25 @@
+name: logging-improvement
+description: "Improve logging patterns"
+project_path: /path/to/project
+metrics:
+  - name: print_statements
+    source: "grep -r 'print(' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 2.0
+  - name: logging_imports
+    source: "grep -r 'import logging' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: up
+    weight: 1.5
+  - name: logger_usage
+    source: "grep -r 'logger\\.' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: up
+    weight: 1.0
+constraints:
+  - "Keep existing log levels"
+  - "Don't remove error logging"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 3
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6

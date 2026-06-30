@@ -1,0 +1,25 @@
+name: ci-cd-optimization
+description: "Optimize CI/CD pipeline"
+project_path: /path/to/project
+metrics:
+  - name: build_time_seconds
+    source: "cat .github/workflows/ci.yml 2>/dev/null | grep -c 'run:' || echo 0"
+    direction: down
+    weight: 2.0
+  - name: workflow_steps
+    source: "grep -c 'uses:\\|run:' .github/workflows/ci.yml 2>/dev/null || echo 0"
+    direction: down
+    weight: 1.5
+  - name: cache_usage
+    source: "grep -c 'actions/cache' .github/workflows/ci.yml 2>/dev/null || echo 0"
+    direction: up
+    weight: 1.0
+constraints:
+  - "Keep all required checks"
+  - "Don't remove security scans"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: tradeoff
+  model: claude-sonnet-4-6
