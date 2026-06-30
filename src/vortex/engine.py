@@ -12,6 +12,7 @@ from vortex.execution import Change, ExecutionEngine, ExecutionResult, Hypothesi
 from vortex.history import CycleHistory, CycleResult, ReflectionMemory
 from vortex.manifest import ManifestConfig
 from vortex.metrics import BaselineManager, MetricsCollector
+from vortex.meta_orchestrator import MetaOrchestrator
 from vortex.self_improve import PerformanceReport, SelfImprover
 from vortex.skill_library import SkillLibrary
 from vortex.tree_search import TreeSearch
@@ -47,6 +48,9 @@ class Optimizer:
 
         # Self-improvement
         self.self_improver = SelfImprover(self.manifest.project_path) if self.manifest.optimizer.self_improve_enabled else None
+
+        # Meta-orchestrator (Chef Architecte)
+        self.orchestrator = MetaOrchestrator(self.manifest)
 
         # Convergence
         from vortex.convergence import ConvergenceConfig, ConvergenceDetector
@@ -118,7 +122,7 @@ class Optimizer:
         )
 
     def _run_cycle(self, cycle_num: int, baseline: dict[str, float]) -> CycleResult:
-        """Run a single optimization cycle."""
+        """Run a single optimization cycle using the Meta-Orchestrator."""
         cycle_id = f"cycle_{cycle_num}_{int(__import__('time').time())}"
         start_time = __import__('time').time()
 
@@ -126,14 +130,24 @@ class Optimizer:
         current = self.collector.collect()
         score, deltas = self.baseline.score(current, baseline)
 
-        # Generate hypotheses
+        # Build context for the orchestrator
         context = {
             "current_metrics": current,
             "baseline_metrics": baseline,
             "score": score,
             "previous_cycles": self.history.get_recent(3),
+            "project_path": str(self.manifest.project_path),
+            "constraints": self.manifest.constraints,
         }
-        changes = self.generator.generate(context)
+
+        # Use Meta-Orchestrator to think strategically
+        decision = self.orchestrator.think(context)
+
+        # Generate changes based on the decision
+        if decision.action == "optimize":
+            changes = self.generator.generate(context)
+        else:
+            changes = []
 
         # Execute changes
         if changes and not self.dry_run:
