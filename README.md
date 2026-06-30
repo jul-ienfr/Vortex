@@ -157,6 +157,37 @@ pytest tests/ -v --cov=vortex         # With coverage
 pytest tests/test_debate.py -v        # Specific test file
 ```
 
+## Example Output
+
+```
+$ vortex analyze /path/to/project
+Analyzing project at /path/to/project (focus: all)
+  Python files: 47
+  Total files: 156
+
+$ vortex run manifest.yaml
+Starting VORTEX optimization for manifest.yaml
+Establishing baseline...
+Baseline: {'test_coverage': 65.0, 'lint_issues': 12}
+Current metrics: {'test_coverage': 68.0, 'lint_issues': 8}
+Score: +0.350
+Deltas: {'test_coverage': 0.046, 'lint_issues': 0.333}
+
+$ vortex status
+VORTEX v0.1.0
+  Modules: 38
+  Test files: 23
+  GitHub: https://github.com/jul-ienfr/Vortex
+  Install: pip install -e .
+  Usage: vortex run manifest.yaml
+
+$ vortex research --topic "self-improving agents"
+Running research cycle...
+Research complete: 15 findings, 8 relevant
+  [high] AgentRefine: Enhancing Agent Generalization
+  [medium] CORD: Generalizable Cooperation via Role Diversity
+```
+
 ## License
 
 MIT

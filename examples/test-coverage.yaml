@@ -1,0 +1,25 @@
+name: test-coverage
+description: "Improve test coverage"
+project_path: /path/to/project
+metrics:
+  - name: test_count
+    source: "python3 -m pytest tests/ --co -q 2>/dev/null | tail -1 | grep -oP '\\d+'"
+    direction: up
+    weight: 2.0
+  - name: coverage_percent
+    source: "python3 -m pytest tests/ --cov=src --cov-report=term 2>/dev/null | grep TOTAL | awk '{print $4}'"
+    direction: up
+    weight: 3.0
+  - name: untested_files
+    source: "python3 -c \"import pathlib; py=set(f.stem for f in pathlib.Path('src').rglob('*.py')); test=set(f.stem.replace('test_','') for f in pathlib.Path('tests').rglob('test_*.py')); print(len(py-test))\""
+    direction: down
+    weight: 1.5
+constraints:
+  - "Don't modify existing tests"
+  - "Tests must be deterministic"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
