@@ -344,12 +344,41 @@ class DebateEngine:
         return DebateResult(topic=topic, participants=[a.name for a in agents[:3]], rounds=rounds)
 
     def _method_steelman(self, topic: str, agents: list[DebateAgent], ctx: dict) -> DebateResult:
-        """Strongest version of each argument."""
-        rounds = [{"round": "Steelman", "action": "Present strongest version of each position"}]
+        """Strongest version of each argument with real LLM calls."""
+        rounds = []
+        for agent in agents:
+            steelman = self._call_llm(agent, f"Present the STRONGEST possible argument for: '{topic}'. Steel-man the position — make it as compelling as possible, even if you disagree (3-4 sentences).")
+            rounds.append({"round": "Steelman", "speaker": agent.name, "argument": steelman})
+
+        # Final synthesis
+        all_steelmans = " ".join([r["argument"] for r in rounds])
+        synthesis_agent = agents[0] if agents else AGENT_POOL[0]
+        synthesis = self._call_llm(synthesis_agent, f"Here are the strongest arguments: '{all_steelmans}'. Which is most compelling and why? (2-3 sentences)")
+        rounds.append({"round": "Synthesis", "speaker": synthesis_agent.name, "argument": synthesis})
+
         return DebateResult(topic=topic, participants=[a.name for a in agents], rounds=rounds)
 
     def _method_panel(self, topic: str, agents: list[DebateAgent], ctx: dict) -> DebateResult:
-        """Open discussion with moderator."""
+        """Open discussion with moderator using real LLM calls."""
         moderator = agents[0] if agents else AGENT_POOL[0]
-        rounds = [{"round": "Open discussion", "moderator": moderator.name, "topic": topic}]
+        panelists = agents[1:] if len(agents) > 1 else agents
+
+        # Moderator opens
+        opening = self._call_llm(moderator, f"You are moderating a panel discussion on: '{topic}'. Open the discussion with a brief framing question (2-3 sentences).")
+
+        # Panelists respond
+        responses = []
+        for agent in panelists:
+            response = self._call_llm(agent, f"The moderator asked: '{opening}'. Give your perspective on: '{topic}' (2-3 sentences).")
+            responses.append({"speaker": agent.name, "argument": response})
+
+        # Moderator synthesizes
+        all_responses = " ".join([r["argument"] for r in responses])
+        synthesis = self._call_llm(moderator, f"Panelist responses: '{all_responses}'. Synthesize the key points and conclude the discussion (2-3 sentences).")
+
+        rounds = [
+            {"round": "Opening", "speaker": moderator.name, "argument": opening},
+            {"round": "Responses", "responses": responses},
+            {"round": "Synthesis", "speaker": moderator.name, "argument": synthesis},
+        ]
         return DebateResult(topic=topic, participants=[a.name for a in agents], rounds=rounds)
