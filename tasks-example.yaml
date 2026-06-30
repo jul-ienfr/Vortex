@@ -1,0 +1,24 @@
+name: vortex-tasks
+description: "VORTEX with specific tasks"
+project_path: /home/jul/projects/vortex
+metrics:
+  - name: source_lines
+    source: "cat src/vortex/*.py | wc -l"
+    direction: down
+    weight: 1.0
+tasks:
+  - "Remove all unused imports from src/vortex/cli.py"
+  - "Add docstrings to all public functions in src/vortex/engine.py that are missing them"
+  - "Simplify the _parse_response method in src/vortex/execution.py"
+constraints:
+  - "Don't break existing tests"
+  - "Keep all functions working"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 3
+  model: mimo-v2.5
+  model_proxy: http://192.168.31.59:4000/v1
+  self_improve_enabled: false
+  debate_enabled: false
+  convergence_stagnation_limit: 5
+  convergence_min_cycles: 1

@@ -109,7 +109,27 @@ class HypothesisGenerator:
 
     def _build_prompt(self, context: dict) -> str:
         """Build the optimization prompt."""
-        return f"""You are an optimization engine for the project at {self.manifest.project_path}.
+        # Get ACTUAL files from the project
+        actual_files = []
+        for f in sorted(self.manifest.project_path.rglob("*.py")):
+            if "venv" not in str(f) and "__pycache__" not in str(f) and ".vortex" not in str(f):
+                rel = str(f.relative_to(self.manifest.project_path))
+                actual_files.append(rel)
+        file_list = "\n".join(f"  {f}" for f in actual_files[:30])
+
+        # Build tasks section if tasks are specified
+        tasks_section = ""
+        if self.manifest.tasks:
+            tasks_list = "\n".join(f"  {i+1}. {t}" for i, t in enumerate(self.manifest.tasks))
+            tasks_section = f"""
+\nSPECIFIC TASKS TO COMPLETE:
+{tasks_list}\n
+You MUST complete these tasks. For each task, generate the changes needed.\n"""
+
+        return f"""You are an optimization engine for the Python project at {self.manifest.project_path}.
+
+ACTUAL FILES IN THE PROJECT:
+{file_list}
 
 Current metrics: {json.dumps(context.get('current_metrics', {}))}
 Baseline metrics: {json.dumps(context.get('baseline_metrics', {}))}
@@ -117,14 +137,20 @@ Score: {context.get('score', 0):.3f}
 
 Constraints:
 {chr(10).join(f'- {c}' for c in self.manifest.constraints)}
+{tasks_section}
 
-Previous cycles:
-{json.dumps(context.get('previous_cycles', []), indent=2)}
+Generate up to {self.manifest.optimizer.max_changes_per_cycle} REAL code changes.
+- You MUST use ONLY files from the list above
+- Do NOT invent file names - they don't exist
+- Do NOT add comments or documentation
+- DO modify existing Python files with actual code improvements
 
-Generate up to {self.manifest.optimizer.max_changes_per_cycle} specific, actionable changes.
-For each change, specify: file, description, rationale.
+For each change, specify:
+1. "file": EXACT file path from the list above
+2. "description": EXACT code change to make
+3. "rationale": why this improves the project
 
-Output as JSON: {{"changes": [{{"file": "...", "description": "...", "rationale": "..."}}]}}"""
+Output ONLY valid JSON: {{"changes": [{{"file": "src/vortex/example.py", "description": "Remove unused import X", "rationale": "Reduces code complexity"}}]}}"""
 
     def _parse_response(self, content: str) -> list[Change]:
         """Parse LLM response into Change objects."""

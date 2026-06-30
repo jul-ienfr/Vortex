@@ -113,6 +113,7 @@ class ManifestConfig(BaseModel):
     project_path: Path
     metrics: list[MetricDef]
     constraints: list[str] = Field(default_factory=list)
+    tasks: list[str] = Field(default_factory=list)  # Specific tasks to execute
     optimizer: OptimizerConfig = Field(default_factory=OptimizerConfig)
 
     @classmethod
