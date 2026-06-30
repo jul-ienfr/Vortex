@@ -32,6 +32,11 @@ optimizer:
   debate_rounds: 3
   model: mimo-v2.5
   model_proxy: http://192.168.31.59:4000/v1
+  models:
+    - mimo-v2.5
+    - deepseek-v4-flash
+  model_for_debate: deepseek-v4-flash
+  model_for_hypothesis: mimo-v2.5
   self_improve_enabled: false
   skill_library_enabled: true
   convergence_stagnation_limit: 5

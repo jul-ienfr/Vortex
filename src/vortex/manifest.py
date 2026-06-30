@@ -92,6 +92,11 @@ class OptimizerConfig(BaseModel):
     model_temperature: float = 0.7
     model_max_tokens: int = 4096
 
+    # Multi-model configuration
+    models: list[str] = Field(default_factory=list)  # ["mimo-v2.5", "deepseek-v4-flash"]
+    model_for_debate: str | None = None  # model for debate agents
+    model_for_hypothesis: str | None = None  # model for hypothesis generation
+
     # Convergence
     convergence_stagnation_limit: int = 10
     convergence_window_size: int = 20

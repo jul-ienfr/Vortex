@@ -68,7 +68,7 @@ class HypothesisGenerator:
         try:
             import litellm
             prompt = self._build_prompt(context)
-            model = self.manifest.optimizer.model or "mimo-v2.5"
+            model = self.manifest.optimizer.model_for_hypothesis or self.manifest.optimizer.model or "mimo-v2.5"
             # For OpenAI-compatible proxies, prefix with openai/
             if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
                 model = f"openai/{model}"

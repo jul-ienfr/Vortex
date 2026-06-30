@@ -15,6 +15,7 @@ class DebateAgent:
     expertise: list[str]
     communication_style: str
     risk_tolerance: str  # "bold", "balanced", "conservative"
+    model: str = "mimo-v2.5"  # which LLM this agent uses
 
     def to_prompt(self) -> str:
         """Convert to system prompt for LLM."""
@@ -71,13 +72,14 @@ class DebateEngine:
         "panel": "Open discussion with moderator",
     }
 
-    def __init__(self, method: str = "standard"):
+    def __init__(self, method: str = "standard", models: list[str] | None = None):
         if method not in self.METHODS:
             raise ValueError(f"Unknown debate method: {method}. Available: {list(self.METHODS.keys())}")
         self.method = method
+        self.models = models or ["mimo-v2.5"]
 
     def create_team(self, n_agents: int = 3) -> list[DebateAgent]:
-        """Create a team of agents with diverse personalities."""
+        """Create a team of agents with diverse personalities and models."""
         # Select diverse agents (different risk tolerances, expertise)
         selected = []
         used_expertise: set[str] = set()
@@ -89,6 +91,8 @@ class DebateEngine:
                 break
             # Prefer agents with non-overlapping expertise
             if not any(e in used_expertise for e in agent.expertise):
+                # Assign model based on position (rotate through available models)
+                agent.model = self.models[len(selected) % len(self.models)]
                 selected.append(agent)
                 used_expertise.update(agent.expertise)
 
@@ -96,6 +100,7 @@ class DebateEngine:
         while len(selected) < n_agents and pool:
             agent = pool.pop()
             if agent not in selected:
+                agent.model = self.models[len(selected) % len(self.models)]
                 selected.append(agent)
 
         return selected[:n_agents]
