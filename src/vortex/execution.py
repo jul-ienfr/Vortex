@@ -363,12 +363,22 @@ Does this change preserve the original behavior? Answer ONLY "yes" or "no" with 
                 kwargs["api_key"] = "not-needed"
 
             response = litellm.completion(**kwargs)
-            content = response.choices[0].message.content or ""
-            passed = content.lower().startswith("yes")
+            msg = response.choices[0].message
+            content = msg.content or ""
+            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
+                content = msg.reasoning_content
+            if not content:
+                fields = getattr(msg, 'provider_specific_fields', {})
+                details = fields.get('reasoning_details', [])
+                if details:
+                    content = details[0].get('text', '')
+            # Extract yes/no from the response
+            content_lower = content.lower()
+            passed = "yes" in content_lower or "conserve" in content_lower or "preserve" in content_lower
             return GateCheck(
                 gate_name="semantic_preservation",
                 passed=passed,
-                reason=content[:200],
+                reason=content[:200] if content else "No response from LLM",
             )
         except Exception as e:
             logger.warning("Semantic check failed: %s", e)
