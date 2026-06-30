@@ -13,6 +13,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="vortex",
         description="VORTEX — Manifest-driven self-improving optimization engine",
     )
+    parser.add_argument("--version", action="version", version="VORTEX 0.1.0")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # vortex run
@@ -140,10 +141,16 @@ def _cmd_projects(args: argparse.Namespace) -> int:
 
 def _cmd_status(args: argparse.Namespace) -> int:
     """Execute the status command."""
-    print("VORTEX v0.1.0")
-    print("  Modules: 24 source files")
-    print("  Tests: 100/100 passing")
-    print("  GitHub: https://github.com/jul-ienfr/Vortex")
+    from pathlib import Path as P
+    vortex_dir = P(__file__).parent.parent.parent
+    src_files = list((vortex_dir / "src" / "vortex").glob("*.py"))
+    test_files = list((vortex_dir / "tests").glob("test_*.py"))
+    print(f"VORTEX v0.1.0")
+    print(f"  Modules: {len(src_files)}")
+    print(f"  Test files: {len(test_files)}")
+    print(f"  GitHub: https://github.com/jul-ienfr/Vortex")
+    print(f"  Install: pip install -e .")
+    print(f"  Usage: vortex run manifest.yaml")
     return 0
 
 
