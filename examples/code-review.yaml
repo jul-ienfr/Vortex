@@ -1,0 +1,25 @@
+name: code-review
+description: "Automated code review and improvement"
+project_path: /path/to/project
+metrics:
+  - name: todo_count
+    source: "grep -r 'TODO\\|FIXME\\|HACK' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 1.5
+  - name: function_length
+    source: "python3 -c \"import ast; funcs=[n for f in __import__('pathlib').Path('.').rglob('*.py') for n in ast.walk(ast.parse(f.read())) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))]; long=[f for f in funcs if hasattr(f,'end_lineno') and f.end_lineno and f.end_lineno-f.lineno>50]; print(len(long))\""
+    direction: down
+    weight: 2.0
+  - name: import_count
+    source: "grep -r '^import\\|^from' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 1.0
+constraints:
+  - "Don't change public API"
+  - "Keep backward compatibility"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 3
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
