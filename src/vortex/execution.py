@@ -177,25 +177,34 @@ class ExecutionEngine:
         return commit_sha
 
     def execute(self, changes: list[Change], context: dict) -> ExecutionResult:
-        """Apply changes to the project files."""
+        """Apply changes to the project files using LLM."""
         start = time.time()
         files_changed = []
 
         try:
             for change in changes:
                 file_path = self.project_path / change.file
+
+                # Skip non-existent files for modify operations
+                if change.change_type == "modify" and not file_path.exists():
+                    logger.warning("File %s does not exist, skipping", change.file)
+                    continue
+
                 if change.change_type == "create":
+                    content = self._generate_file_content(change)
                     file_path.parent.mkdir(parents=True, exist_ok=True)
-                    file_path.write_text(change.description)
+                    file_path.write_text(content)
+                    files_changed.append(change.file)
                 elif change.change_type == "delete":
                     if file_path.exists():
                         file_path.unlink()
-                else:  # modify
-                    # For now, append the description as a comment
-                    # Real implementation will use LLM to make actual changes
-                    with open(file_path, "a") as f:
-                        f.write(f"\n# VORTEX: {change.description}\n")
-                files_changed.append(change.file)
+                    files_changed.append(change.file)
+                else:  # modify - use LLM to apply the change
+                    original = file_path.read_text()
+                    new_content = self._apply_change_with_llm(original, change)
+                    if new_content and new_content != original:
+                        file_path.write_text(new_content)
+                        files_changed.append(change.file)
 
             # Capture diff
             diff_result = subprocess.run(
@@ -220,6 +229,73 @@ class ExecutionEngine:
                 error=str(e),
                 duration_ms=duration_ms,
             )
+
+
+    def _generate_file_content(self, change: Change) -> str:
+        """Use LLM to generate file content."""
+        try:
+            import litellm
+            import os
+            prompt = f"""Generate Python code for a new file.
+Description: {change.description}
+Rationale: {change.rationale}
+Output ONLY the Python code, no explanations."""
+            model = self.manifest.optimizer.model or "mimo-v2.5"
+            if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
+                model = f"openai/{model}"
+            kwargs = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 2000}
+            if self.manifest.optimizer.model_proxy:
+                kwargs["api_base"] = self.manifest.optimizer.model_proxy
+                if not os.environ.get("OPENAI_API_KEY"):
+                    kwargs["api_key"] = "not-needed"
+            response = litellm.completion(**kwargs)
+            msg = response.choices[0].message
+            content = msg.content or ""
+            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
+                content = msg.reasoning_content
+            return content or f"# {change.description}"
+        except Exception as e:
+            logger.warning("LLM file generation failed: %s", e)
+            return f"# {change.description}"
+
+    def _apply_change_with_llm(self, original: str, change: Change) -> str | None:
+        """Use LLM to apply a change to existing code."""
+        try:
+            import litellm
+            import os
+            truncated = original[:3000] if len(original) > 3000 else original
+            prompt = f"""You are a code editor. Apply this change to the existing code:
+
+EXISTING CODE:
+```python
+{truncated}
+```
+
+CHANGE TO MAKE: {change.description}
+RATIONALE: {change.rationale}
+
+Output the COMPLETE modified code. Do NOT add comments. Do NOT explain. Just output the code."""
+            model = self.manifest.optimizer.model or "mimo-v2.5"
+            if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
+                model = f"openai/{model}"
+            kwargs = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 4096}
+            if self.manifest.optimizer.model_proxy:
+                kwargs["api_base"] = self.manifest.optimizer.model_proxy
+                if not os.environ.get("OPENAI_API_KEY"):
+                    kwargs["api_key"] = "not-needed"
+            response = litellm.completion(**kwargs)
+            msg = response.choices[0].message
+            content = msg.content or ""
+            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
+                content = msg.reasoning_content
+            if "```python" in content:
+                content = content.split("```python")[1].split("```")[0]
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0]
+            return content.strip() if content else None
+        except Exception as e:
+            logger.warning("LLM code modification failed: %s", e)
+            return None
 
     def rollback(self, commit_sha: str) -> bool:
         """Revert to a specific commit."""
