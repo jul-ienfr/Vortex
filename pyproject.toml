@@ -65,13 +65,10 @@ strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
 markers = [
     "slow: marks tests as slow",
     "integration: marks integration tests",
-<<<<<<< HEAD
 ]
-
-# VORTEX: Update lint configuration to ignore common false positives in type annotations and string formatting patterns specific to this project
-=======
-]
->>>>>>> 7987b7b
