@@ -1,0 +1,26 @@
+name: security-audit
+description: "Audit and improve project security"
+project_path: /path/to/project
+metrics:
+  - name: security_issues
+    source: "bandit -r src/ -f json 2>/dev/null | python3 -c \"import sys,json; d=json.load(sys.stdin); print(len(d.get('results',[])))\""
+    direction: down
+    weight: 3.0
+  - name: dependency_vulnerabilities
+    source: "pip-audit --format json 2>/dev/null | python3 -c \"import sys,json; d=json.load(sys.stdin); print(len(d.get('vulnerabilities',[])))\""
+    direction: down
+    weight: 2.0
+  - name: hardcoded_secrets
+    source: "grep -r 'password\\|secret\\|api_key' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 2.5
+constraints:
+  - "Don't break existing functionality"
+  - "Keep security fixes backward compatible"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 1
+  debate_enabled: true
+  debate_method: premortem
+  model: claude-sonnet-4-6
+  budget_limit_usd: 5.0

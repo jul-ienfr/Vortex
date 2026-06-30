@@ -1,0 +1,25 @@
+name: documentation-quality
+description: "Improve project documentation"
+project_path: /path/to/project
+metrics:
+  - name: readme_lines
+    source: "wc -l README.md 2>/dev/null | awk '{print $1}'"
+    direction: up
+    weight: 2.0
+  - name: docstring覆盖率
+    source: "python3 -c \"import ast,sys; files=list(__import__('pathlib').Path('.').rglob('*.py')); funcs=sum(len([n for n in ast.walk(ast.parse(f.read())) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))]) for f in files if f.is_file()); documented=sum(1 for f in files for n in ast.walk(ast.parse(f.read())) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and ast.get_docstring(n)); print(f'{documented}/{funcs}')\" 2>/dev/null | awk -F/ '{print $1/$2*100}'"
+    direction: up
+    weight: 1.5
+  - name: examples_count
+    source: "find examples -name '*.py' 2>/dev/null | wc -l"
+    direction: up
+    weight: 1.0
+constraints:
+  - "Don't remove existing documentation"
+  - "Keep examples simple and runnable"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
