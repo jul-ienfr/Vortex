@@ -44,9 +44,9 @@ def test_api_not_found():
     assert "error" in result
 
 
-def test_marketplace_crud():
+def test_marketplace_crud(tmp_path):
     """Test plugin marketplace CRUD."""
-    market = PluginMarketplace(Path("/tmp/vortex_market_test"))
+    market = PluginMarketplace(tmp_path / "market")
     plugin = PluginInfo(name="test-plugin", version="1.0.0", description="Test", author="Test", category="metric")
     market.install(plugin)
     assert len(market.list_installed()) == 1
@@ -54,9 +54,9 @@ def test_marketplace_crud():
     assert len(market.list_installed()) == 0
 
 
-def test_marketplace_search():
+def test_marketplace_search(tmp_path):
     """Test plugin search."""
-    market = PluginMarketplace(Path("/tmp/vortex_market_test"))
+    market = PluginMarketplace(tmp_path / "market2")
     market.install(PluginInfo(name="prometheus", version="1.0", description="Metrics", author="Test", category="metric"))
     results = market.search("prometheus")
     assert len(results) == 1
