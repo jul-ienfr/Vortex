@@ -106,17 +106,59 @@ class DebateEngine:
         return selected[:n_agents]
 
     def debate(self, topic: str, agents: list[DebateAgent], context: dict | None = None) -> DebateResult:
-        """Run a debate on a topic."""
+        """Run a debate on a topic using actual LLM calls."""
         method_handler = getattr(self, f"_method_{self.method}")
         return method_handler(topic, agents, context or {})
 
+    def _call_llm(self, agent: DebateAgent, prompt: str) -> str:
+        """Call the LLM for a specific agent."""
+        try:
+            import litellm
+            import os
+
+            model = agent.model
+            # For OpenAI-compatible proxies, prefix with openai/
+            if not model.startswith("openai/"):
+                model = f"openai/{model}"
+
+            kwargs = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": agent.to_prompt()},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.7,
+                "max_tokens": 1024,
+            }
+
+            # Add proxy
+            kwargs["api_base"] = "http://192.168.31.59:4000/v1"
+            if not os.environ.get("OPENAI_API_KEY"):
+                kwargs["api_key"] = "not-needed"
+
+            response = litellm.completion(**kwargs)
+            msg = response.choices[0].message
+            content = msg.content or ""
+            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
+                content = msg.reasoning_content
+            if not content:
+                fields = getattr(msg, 'provider_specific_fields', {})
+                details = fields.get('reasoning_details', [])
+                if details:
+                    content = details[0].get('text', '')
+            return content or "No response"
+        except Exception as e:
+            return f"[Error: {e}]"
+
     def _method_standard(self, topic: str, agents: list[DebateAgent], ctx: dict) -> DebateResult:
-        """Standard round-robin discussion."""
+        """Standard round-robin discussion with real LLM calls."""
         rounds = []
         for round_num in range(3):
             round_data = {"round": round_num + 1, "positions": {}}
             for agent in agents:
-                round_data["positions"][agent.name] = f"Position from {agent.name} on: {topic}"
+                prompt = f"Round {round_num + 1}: Give your position on '{topic}'. Be concise (2-3 sentences)."
+                position = self._call_llm(agent, prompt)
+                round_data["positions"][agent.name] = position
             rounds.append(round_data)
         return DebateResult(topic=topic, participants=[a.name for a in agents], rounds=rounds)
 
