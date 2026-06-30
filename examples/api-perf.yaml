@@ -1,0 +1,27 @@
+name: api-performance
+description: "Optimize API response times"
+project_path: /home/jul/projects/my-api
+metrics:
+  - name: response_time_p95
+    source: "curl -w '%{time_total}' -o /dev/null -s http://localhost:3000/health"
+    direction: down
+    weight: 3.0
+  - name: memory_usage_mb
+    source: "ps aux | grep my-api | awk '{print $6/1024}'"
+    direction: down
+    weight: 1.5
+  - name: error_rate
+    source: "curl -s http://localhost:3000/metrics | grep errors_total | awk '{print $2}'"
+    direction: down
+    weight: 2.0
+constraints:
+  - "Keep API backwards compatible"
+  - "Don't modify database schema"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: tradeoff
+  model: claude-sonnet-4-6
+  budget_limit_usd: 10.0
+  convergence_stagnation_limit: 5

@@ -1,0 +1,30 @@
+name: self-optimizer
+description: "VORTEX optimizes itself"
+project_path: /home/jul/projects/vortex
+metrics:
+  - name: test_count
+    source: "python3 -m pytest tests/ --co -q 2>/dev/null | tail -1 | grep -oP '\\d+'"
+    direction: up
+    weight: 2.0
+  - name: source_lines
+    source: "find src/vortex -name '*.py' -exec cat {} + | wc -l"
+    direction: up
+    weight: 1.0
+  - name: code_quality
+    source: "source .venv/bin/activate && ruff check src/ --statistics 2>/dev/null | wc -l"
+    direction: down
+    weight: 1.5
+constraints:
+  - "Don't break existing tests"
+  - "Maintain backward compatibility"
+  - "Max 2 files modified per cycle"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  rollback_on_regression: true
+  debate_enabled: true
+  debate_method: standard
+  self_improve_enabled: false  # avoid infinite recursion
+  model: claude-sonnet-4-6
+  convergence_stagnation_limit: 10
+  convergence_target_score: null

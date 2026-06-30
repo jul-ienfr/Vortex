@@ -1,0 +1,39 @@
+name: leboncoin
+description: "Optimize Leboncoin reselling"
+project_path: /home/jul/projects/Panier
+metrics:
+  - name: marge_moyenne
+    source: "python3 -c \"import json; d=json.load(open('stats.json')); print(d.get('avg_margin', 0))\""
+    direction: up
+    weight: 2.0
+  - name: vitesse_vente_jours
+    source: "python3 -c \"import json; d=json.load(open('stats.json')); print(d.get('avg_days_to_sell', 30))\""
+    direction: down
+    weight: 1.5
+  - name: nb_annonces_actives
+    source: "python3 -c \"import json; d=json.load(open('stats.json')); print(d.get('active_listings', 0))\""
+    direction: up
+    weight: 1.0
+constraints:
+  - "Ne pas modifier les prix existants sans validation"
+  - "Garder les catégories actives"
+  - "Max 3 modifications par cycle"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 3
+  rollback_on_regression: true
+  debate_enabled: true
+  debate_method: standard
+  debate_rounds: 3
+  debate_roles:
+    - "optimist"
+    - "skeptic"
+    - "pragmatist"
+  model: claude-sonnet-4-6
+  model_temperature: 0.7
+  research_interval: 5
+  research_topics:
+    - "reselling optimization"
+    - "pricing strategy"
+    - "marketplace algorithms"
+  auto_research_on_stagnation: true
