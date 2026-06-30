@@ -1,0 +1,25 @@
+name: flask-optimization
+description: "Optimize Flask application"
+project_path: /path/to/flask/project
+metrics:
+  - name: route_count
+    source: "grep -r '@app.route\\|@blueprint.route' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: up
+    weight: 1.0
+  - name: middleware_count
+    source: "grep -r '@app.before_request\\|@app.after_request' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: down
+    weight: 1.5
+  - name: response_time
+    source: "curl -w '%{time_total}' -o /dev/null -s http://localhost:5000/ 2>/dev/null || echo 0"
+    direction: down
+    weight: 2.0
+constraints:
+  - "Keep all routes functional"
+  - "Don't remove authentication"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
