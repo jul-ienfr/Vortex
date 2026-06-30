@@ -1,0 +1,25 @@
+name: api-documentation
+description: "Improve API documentation quality"
+project_path: /path/to/api/project
+metrics:
+  - name: endpoint_count
+    source: "grep -r '@app.route\\|@router' src/ --include='*.py' 2>/dev/null | wc -l"
+    direction: up
+    weight: 1.0
+  - name: documented_endpoints
+    source: "python3 -c \"import ast; funcs=[n for f in __import__('pathlib').Path('.').rglob('*.py') for n in ast.walk(ast.parse(f.read())) if isinstance(n,ast.FunctionDef) and hasattr(n,'decorator_list')]; documented=sum(1 for f in funcs if ast.get_docstring(f)); print(f'{documented}/{len(funcs)}')\" 2>/dev/null | awk -F/ '{print $1/$2*100}'"
+    direction: up
+    weight: 2.0
+  - name: openapi_spec
+    source: "test -f openapi.json && echo 1 || echo 0"
+    direction: up
+    weight: 1.5
+constraints:
+  - "Keep API backwards compatible"
+  - "Don't remove existing documentation"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 2
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6

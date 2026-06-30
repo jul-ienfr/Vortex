@@ -1,0 +1,26 @@
+name: performance-profiling
+description: "Profile and optimize application performance"
+project_path: /path/to/project
+metrics:
+  - name: startup_time_ms
+    source: "python3 -c \"import time; start=time.time(); __import__('app'); print(int((time.time()-start)*1000))\""
+    direction: down
+    weight: 2.0
+  - name: memory_peak_mb
+    source: "python3 -c \"import tracemalloc; tracemalloc.start(); __import__('app'); print(int(tracemalloc.get_traced_memory()[1]/1024/1024))\""
+    direction: down
+    weight: 1.5
+  - name: import_time_ms
+    source: "python3 -c \"import time; start=time.time(); import app; print(int((time.time()-start)*1000))\""
+    direction: down
+    weight: 1.0
+constraints:
+  - "Don't change public API"
+  - "Keep backward compatibility"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 1
+  debate_enabled: true
+  debate_method: tradeoff
+  model: claude-sonnet-4-6
+  budget_limit_usd: 5.0
