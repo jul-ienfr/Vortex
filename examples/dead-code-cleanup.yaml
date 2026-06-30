@@ -1,0 +1,25 @@
+name: dead-code-cleanup
+description: "Remove dead code and unused imports"
+project_path: /path/to/project
+metrics:
+  - name: unused_imports
+    source: "ruff check src/ --select F401 2>/dev/null | wc -l"
+    direction: down
+    weight: 2.0
+  - name: dead_functions
+    source: "python3 -c \"import ast; funcs=[n.name for f in __import__('pathlib').Path('.').rglob('*.py') for n in ast.walk(ast.parse(f.read())) if isinstance(n,ast.FunctionDef)]; refs=sum(1 for name in funcs if sum(1 for f2 in __import__('pathlib').Path('.').rglob('*.py') if name in f2.read_text())>1); print(len(funcs)-refs)\" 2>/dev/null"
+    direction: down
+    weight: 1.5
+  - name: total_lines
+    source: "find src/ -name '*.py' -exec cat {} + | wc -l"
+    direction: down
+    weight: 1.0
+constraints:
+  - "Don't remove public API functions"
+  - "Don't break existing tests"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 3
+  debate_enabled: true
+  debate_method: standard
+  model: claude-sonnet-4-6
