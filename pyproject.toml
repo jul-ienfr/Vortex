@@ -68,3 +68,5 @@ markers = [
     "slow: marks tests as slow",
     "integration: marks integration tests",
 ]
+
+# VORTEX: Update lint configuration to ignore common false positives in type annotations and string formatting patterns specific to this project
