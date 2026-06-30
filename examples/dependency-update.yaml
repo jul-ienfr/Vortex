@@ -1,0 +1,27 @@
+name: dependency-update
+description: "Update project dependencies"
+project_path: /path/to/project
+metrics:
+  - name: outdated_packages
+    source: "pip list --outdated 2>/dev/null | wc -l"
+    direction: down
+    weight: 2.0
+  - name: security_advisories
+    source: "pip-audit 2>/dev/null | grep -c 'PYSEC'"
+    direction: down
+    weight: 3.0
+  - name: total_dependencies
+    source: "pip list 2>/dev/null | wc -l"
+    direction: down
+    weight: 1.0
+constraints:
+  - "Don't break existing functionality"
+  - "Test after each update"
+  - "Keep major versions unless necessary"
+optimizer:
+  cli: claude
+  max_changes_per_cycle: 1
+  debate_enabled: true
+  debate_method: premortem
+  model: claude-sonnet-4-6
+  budget_limit_usd: 3.0
