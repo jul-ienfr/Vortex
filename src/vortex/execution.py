@@ -78,16 +78,30 @@ class HypothesisGenerator:
                 "model": model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.7,
-                "max_tokens": 1000,
+                "max_tokens": 4096,
             }
 
             # Add proxy if configured (OpenAI-compatible endpoint)
             if self.manifest.optimizer.model_proxy:
                 kwargs["api_base"] = self.manifest.optimizer.model_proxy
+                # For local proxies, use dummy API key if not set
+                import os
+                if not os.environ.get("OPENAI_API_KEY"):
+                    kwargs["api_key"] = "not-needed"
 
             response = litellm.completion(**kwargs)
 
-            content = response.choices[0].message.content
+            # Handle reasoning models (content may be in reasoning_content)
+            msg = response.choices[0].message
+            content = msg.content or ""
+            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
+                content = msg.reasoning_content
+            if not content:
+                # Try to extract from provider_specific_fields
+                fields = getattr(msg, 'provider_specific_fields', {})
+                details = fields.get('reasoning_details', [])
+                if details:
+                    content = details[0].get('text', '')
             return self._parse_response(content)
         except Exception as e:
             logger.warning("LLM hypothesis generation failed: %s", e)
