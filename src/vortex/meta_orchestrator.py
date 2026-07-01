@@ -174,7 +174,7 @@ Donne ton avis en 2-3 phrases. Sois spécifique et actionnable."""
 
         # Questions sur les améliorations des agents
         for role, opinion in analysis.get("agent_opinions", {}).items():
-            if opinion:
+            if opinion and isinstance(opinion, str):
                 questions.append(f"Amélioration {role}: {opinion[:100]}")
 
         return questions[:5]  # Limiter à 5 questions
