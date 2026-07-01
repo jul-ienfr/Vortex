@@ -90,27 +90,22 @@ class MetaOrchestrator:
         return files[:30]
 
     def _consult_specialists(self, own_analysis: dict) -> dict:
-        """Demande l'avis d'agents spécialisés."""
-        opinions = {}
+        """Demande l'avis d'agents spécialisés (1 seul appel LLM)."""
+        # Un seul appel LLM pour tous les avis
+        prompt = f"""Tu es un expert en Python. Voici le contexte du projet:
+{json.dumps(own_analysis, indent=2)[:500]}
 
-        # Toujours consulter Performance et Qualité
-        opinions["performance"] = self._ask_specialist("performance",
-            "Qu'est-ce qui pourrait améliorer les performances du projet ?", own_analysis)
-        opinions["qualite"] = self._ask_specialist("qualite",
-            "Qu'est-ce qui pourrait améliorer la qualité du code ?", own_analysis)
-
-        # Consulter d'autres agents selon le contexte
-        if self._has_tests():
-            opinions["testing"] = self._ask_specialist("testing",
-                "Qu'est-ce qui pourrait améliorer les tests ?", own_analysis)
-        if self._has_api():
-            opinions["api"] = self._ask_specialist("api",
-                "Qu'est-ce qui pourrait améliorer l'API ?", own_analysis)
-        if self._has_database():
-            opinions["bdd"] = self._ask_specialist("bdd",
-                "Qu'est-ce qui pourrait améliorer la BDD ?", own_analysis)
-
-        return opinions
+Donne 3 améliorations possibles (une pour performance, une pour qualité, une pour sécurité).
+Format: {{"performance": "...", "qualite": "...", "securite": "..."}}"""
+        try:
+            response = self._call_llm(prompt)
+            import re
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        except Exception:
+            pass
+        return {"general": "Amélioration générale du code"}
 
     def _has_tests(self) -> bool:
         """Vérifie si le projet a des tests."""

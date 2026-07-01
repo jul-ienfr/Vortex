@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import random
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -148,7 +151,8 @@ class DebateEngine:
                     content = details[0].get('text', '')
             return content or "No response"
         except Exception as e:
-            return f"[Error: {e}]"
+            logger.warning("LLM call failed: %s", e)
+            return f"[LLM indisponible: {e}]"
 
     def _method_standard(self, topic: str, agents: list[DebateAgent], ctx: dict) -> DebateResult:
         """Standard round-robin discussion with real LLM calls."""
