@@ -121,6 +121,38 @@ class Optimizer:
             stats["total_cycles"], stats["best_score"], stats["best_cycle"],
         )
 
+    def _generate_failure_reflection(self, changes: list[Change], old_score: float,
+                                      new_score: float, old_deltas: dict, new_deltas: dict) -> str:
+        """Generate a reflection about why a cycle failed, using a DEBATE."""
+        # Identify which metrics got worse
+        worse_metrics = []
+        for metric, new_delta in new_deltas.items():
+            old_delta = old_deltas.get(metric, 0)
+            if new_delta < old_delta:
+                worse_metrics.append(f"{metric}: {old_delta:.3f} → {new_delta:.3f}")
+
+        # Identify what changes were made
+        change_descriptions = [f"{c.file}: {c.description}" for c in changes]
+
+        # Organize a DEBATE about the failure
+        from vortex.debate import DebateEngine
+        debate = DebateEngine("premortem", models=['mimo-v2.5'])
+        agent = debate.create_team(1)[0]
+
+        failure_context = (
+            f"Un cycle d'optimisation a ÉCHOUÉ.\n"
+            f"Score: {old_score:.3f} → {new_score:.3f} (régression).\n"
+            f"Changements tentés: {', '.join(change_descriptions)}\n"
+            f"Métriques dégradées: {', '.join(worse_metrics) if worse_metrics else 'aucune identifiée'}\n\n"
+            f"Analyse POURQUOI cet échec a eu lieu.\n"
+            f"Propose comment ÉVITER cet échec dans le futur."
+        )
+
+        debate_result = debate.debate(failure_context, [agent])
+        reflection = debate_result.rounds[0]["argument"] if debate_result.rounds else "No reflection generated"
+
+        return reflection
+
     def _run_cycle(self, cycle_num: int, baseline: dict[str, float]) -> CycleResult:
         """Run a single optimization cycle using the Meta-Orchestrator."""
         cycle_id = f"cycle_{cycle_num}_{int(__import__('time').time())}"
@@ -131,11 +163,20 @@ class Optimizer:
         score, deltas = self.baseline.score(current, baseline)
 
         # Build context for the orchestrator
+        # Include failure reflections from previous cycles
+        recent_cycles = self.history.get_recent(5)
+        failure_reflections = [
+            c.get("reflection", "")
+            for c in recent_cycles
+            if c.get("decision") == "reverted" and c.get("reflection")
+        ]
+
         context = {
             "current_metrics": current,
             "baseline_metrics": baseline,
             "score": score,
-            "previous_cycles": self.history.get_recent(3),
+            "previous_cycles": recent_cycles,
+            "failure_reflections": failure_reflections,  # NEW: past failures
             "project_path": str(self.manifest.project_path),
             "constraints": self.manifest.constraints,
         }
@@ -176,6 +217,10 @@ class Optimizer:
             if post_score < score:
                 # Regression — rollback
                 self.executor.rollback(commit_sha)
+                # Generate reflection about WHY it failed
+                reflection = self._generate_failure_reflection(
+                    changes, score, post_score, deltas, post_deltas
+                )
                 return CycleResult(
                     cycle_id=cycle_id,
                     timestamp=__import__('datetime').datetime.now().isoformat(),
@@ -187,6 +232,7 @@ class Optimizer:
                     per_metric_delta=post_deltas,
                     decision="reverted",
                     commit_sha=commit_sha,
+                    reflection=reflection,
                 )
             else:
                 # Improvement — commit

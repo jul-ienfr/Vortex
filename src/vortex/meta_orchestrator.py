@@ -157,6 +157,15 @@ Donne ton avis en 2-3 phrases. Sois spécifique et actionnable."""
         if metrics.get("test_count", 0) < 100:
             questions.append("Faut-il ajouter des tests ?")
 
+        # Questions sur les échecs précédents (REFLEXION)
+        failure_reflections = analysis.get("failure_reflections", [])
+        if failure_reflections:
+            last_failure = failure_reflections[-1]
+            questions.append(
+                f"Un cycle a échoué: {last_failure[:200]}. "
+                f"Comment éviter cet échec ?"
+            )
+
         # Questions sur l'historique
         history = analysis.get("history", [])
         if history:
