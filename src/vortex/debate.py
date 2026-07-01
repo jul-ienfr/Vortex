@@ -116,11 +116,18 @@ class DebateEngine:
     def _call_llm(self, agent: DebateAgent, prompt: str) -> str:
         """Call the LLM for a specific agent."""
         try:
+            # Use the manifest's LLM client if available
+            if hasattr(self, 'manifest') and self.manifest:
+                from vortex.llm_factory import create_client
+                client = create_client(self.manifest)
+                full_prompt = f"{agent.to_prompt()}\n\n{prompt}"
+                return client.complete(full_prompt) or "No response"
+
+            # Fallback to litellm for backward compatibility
             import litellm
             import os
 
             model = agent.model
-            # For OpenAI-compatible proxies, prefix with openai/
             if not model.startswith("openai/"):
                 model = f"openai/{model}"
 
@@ -134,7 +141,6 @@ class DebateEngine:
                 "max_tokens": 1024,
             }
 
-            # Add proxy
             kwargs["api_base"] = "http://192.168.31.59:4000/v1"
             if not os.environ.get("OPENAI_API_KEY"):
                 kwargs["api_key"] = "not-needed"

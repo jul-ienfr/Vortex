@@ -262,31 +262,9 @@ Donne ton avis en 2-3 phrases. Sois spécifique et actionnable."""
     def _call_llm(self, prompt: str) -> str:
         """Appelle le LLM pour obtenir une réponse."""
         try:
-            import litellm
-            import os
-
-            model = self.manifest.optimizer.model or "mimo-v2.5"
-            if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
-                model = f"openai/{model}"
-
-            kwargs = {
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 500,
-            }
-
-            if self.manifest.optimizer.model_proxy:
-                kwargs["api_base"] = self.manifest.optimizer.model_proxy
-                if not os.environ.get("OPENAI_API_KEY"):
-                    kwargs["api_key"] = "not-needed"
-
-            response = litellm.completion(**kwargs)
-            msg = response.choices[0].message
-            content = msg.content or ""
-            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
-                content = msg.reasoning_content
-            return content or "No response"
+            from vortex.llm_factory import create_client
+            client = create_client(self.manifest)
+            return client.complete(prompt) or "No response"
         except Exception as e:
             logger.warning("LLM call failed: %s", e)
             return f"[Error: {e}]"
