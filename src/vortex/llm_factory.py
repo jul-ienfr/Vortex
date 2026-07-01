@@ -26,9 +26,11 @@ class LLMClient(ABC):
 class ClaudeCodeClient(LLMClient):
     """Client pour Claude Code CLI (PAR DÉFAUT)."""
 
-    def __init__(self, project_path: Path):
+    def __init__(self, project_path: Path, model: str = None, proxy: str = None):
         self.project_path = project_path
         self.claude_bin = self._find_claude_bin()
+        self.model = model
+        self.proxy = proxy
 
     def _find_claude_bin(self) -> str:
         """Trouve le binaire Claude Code."""
@@ -48,12 +50,29 @@ class ClaudeCodeClient(LLMClient):
         raise FileNotFoundError("Claude Code non trouvé. Installez-le avec: npm install -g @anthropic-ai/claude-code")
 
     def complete(self, prompt: str, **kwargs) -> str:
-        """Exécute Claude Code CLI."""
+        """Exécute Claude Code CLI avec modèle et proxy configurés."""
         try:
+            cmd = [self.claude_bin, "-p", prompt, "--output-format", "json"]
+
+            # Ajouter le modèle si configuré
+            if self.model:
+                cmd.extend(["--model", self.model])
+
+            # Configurer le proxy via les variables d'environnement
+            env = os.environ.copy()
+            if self.proxy:
+                # Claude Code utilise ANTHROPIC_API_KEY pour l'auth
+                # Pour un proxy local, on peut utiliser une clé factice
+                if not env.get("ANTHROPIC_API_KEY"):
+                    env["ANTHROPIC_API_KEY"] = "not-needed"
+                # Le proxy doit être configuré dans ~/.claude/ ou via env
+                env["ANTHROPIC_BASE_URL"] = self.proxy
+
             result = subprocess.run(
-                [self.claude_bin, "-p", prompt, "--output-format", "json"],
+                cmd,
                 capture_output=True, text=True, timeout=300,
-                cwd=str(self.project_path)
+                cwd=str(self.project_path),
+                env=env
             )
             if result.returncode != 0:
                 logger.warning("Claude Code returned non-zero: %s", result.stderr[:200])
@@ -180,7 +199,11 @@ def create_client(manifest: ManifestConfig) -> LLMClient:
     cli = manifest.optimizer.cli
 
     if cli == "claude":
-        return ClaudeCodeClient(manifest.project_path)
+        return ClaudeCodeClient(
+            manifest.project_path,
+            model=manifest.optimizer.model,
+            proxy=manifest.optimizer.model_proxy,
+        )
     elif cli == "codex":
         return CodexClient(manifest.project_path)
     elif cli == "hermes":
@@ -192,4 +215,8 @@ def create_client(manifest: ManifestConfig) -> LLMClient:
         )
     else:
         # Défaut: Claude Code
-        return ClaudeCodeClient(manifest.project_path)
+        return ClaudeCodeClient(
+            manifest.project_path,
+            model=manifest.optimizer.model,
+            proxy=manifest.optimizer.model_proxy,
+        )
