@@ -23,7 +23,7 @@ class MetricDef(BaseModel):
 class OptimizerConfig(BaseModel):
     """Configuration for the optimizer engine."""
 
-    cli: Literal["claude", "codex", "hermes"] = "claude"
+    cli: Literal["claude", "codex", "hermes", "litellm"] = "claude"
     max_changes_per_cycle: int = 3
     max_moves_per_cycle: int | None = None  # None = unlimited
     rollback_on_regression: bool = True

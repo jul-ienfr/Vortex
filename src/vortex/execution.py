@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from vortex.manifest import ManifestConfig
+from vortex.llm_factory import create_client
 
 logger = logging.getLogger(__name__)
 
@@ -62,46 +63,13 @@ class HypothesisGenerator:
 
     def __init__(self, manifest: ManifestConfig):
         self.manifest = manifest
+        self.client = create_client(manifest)
 
     def generate(self, context: dict) -> list[Change]:
         """Generate hypotheses based on current context."""
         try:
-            import litellm
             prompt = self._build_prompt(context)
-            model = self.manifest.optimizer.model_for_hypothesis or self.manifest.optimizer.model or "mimo-v2.5"
-            # For OpenAI-compatible proxies, prefix with openai/
-            if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
-                model = f"openai/{model}"
-
-            # Build kwargs for litellm
-            kwargs = {
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 4096,
-            }
-
-            # Add proxy if configured (OpenAI-compatible endpoint)
-            if self.manifest.optimizer.model_proxy:
-                kwargs["api_base"] = self.manifest.optimizer.model_proxy
-                # For local proxies, use dummy API key if not set
-                import os
-                if not os.environ.get("OPENAI_API_KEY"):
-                    kwargs["api_key"] = "not-needed"
-
-            response = litellm.completion(**kwargs)
-
-            # Handle reasoning models (content may be in reasoning_content)
-            msg = response.choices[0].message
-            content = msg.content or ""
-            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
-                content = msg.reasoning_content
-            if not content:
-                # Try to extract from provider_specific_fields
-                fields = getattr(msg, 'provider_specific_fields', {})
-                details = fields.get('reasoning_details', [])
-                if details:
-                    content = details[0].get('text', '')
+            content = self.client.complete(prompt)
             return self._parse_response(content)
         except Exception as e:
             logger.warning("LLM hypothesis generation failed: %s", e)
@@ -179,6 +147,7 @@ class ExecutionEngine:
     def __init__(self, manifest: ManifestConfig):
         self.manifest = manifest
         self.project_path = manifest.project_path
+        self.client = create_client(manifest)
 
     def setup_cycle(self) -> str:
         """Create an optimizer branch and return the current commit SHA."""
@@ -286,25 +255,11 @@ class ExecutionEngine:
     def _generate_file_content(self, change: Change) -> str:
         """Use LLM to generate file content."""
         try:
-            import litellm
-            import os
             prompt = f"""Generate Python code for a new file.
 Description: {change.description}
 Rationale: {change.rationale}
 Output ONLY the Python code, no explanations."""
-            model = self.manifest.optimizer.model or "mimo-v2.5"
-            if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
-                model = f"openai/{model}"
-            kwargs = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 2000}
-            if self.manifest.optimizer.model_proxy:
-                kwargs["api_base"] = self.manifest.optimizer.model_proxy
-                if not os.environ.get("OPENAI_API_KEY"):
-                    kwargs["api_key"] = "not-needed"
-            response = litellm.completion(**kwargs)
-            msg = response.choices[0].message
-            content = msg.content or ""
-            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
-                content = msg.reasoning_content
+            content = self.client.complete(prompt)
             return content or f"# {change.description}"
         except Exception as e:
             logger.warning("LLM file generation failed: %s", e)
@@ -313,8 +268,6 @@ Output ONLY the Python code, no explanations."""
     def _apply_change_with_llm(self, original: str, change: Change) -> str | None:
         """Use LLM to apply a change to existing code."""
         try:
-            import litellm
-            import os
             truncated = original[:3000] if len(original) > 3000 else original
             prompt = f"""You are a code editor. Apply this change to the existing code:
 
@@ -327,19 +280,7 @@ CHANGE TO MAKE: {change.description}
 RATIONALE: {change.rationale}
 
 Output the COMPLETE modified code. Do NOT add comments. Do NOT explain. Just output the code."""
-            model = self.manifest.optimizer.model or "mimo-v2.5"
-            if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
-                model = f"openai/{model}"
-            kwargs = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 4096}
-            if self.manifest.optimizer.model_proxy:
-                kwargs["api_base"] = self.manifest.optimizer.model_proxy
-                if not os.environ.get("OPENAI_API_KEY"):
-                    kwargs["api_key"] = "not-needed"
-            response = litellm.completion(**kwargs)
-            msg = response.choices[0].message
-            content = msg.content or ""
-            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
-                content = msg.reasoning_content
+            content = self.client.complete(prompt)
             if "```python" in content:
                 content = content.split("```python")[1].split("```")[0]
             elif "```" in content:
