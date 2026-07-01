@@ -90,13 +90,9 @@ class MetaOrchestrator:
         return files[:30]
 
     def _consult_specialists(self, own_analysis: dict) -> dict:
-        """Demande l'avis d'agents spécialisés (1 seul appel LLM)."""
-        # Un seul appel LLM pour tous les avis
-        prompt = f"""Tu es un expert en Python. Voici le contexte du projet:
-{json.dumps(own_analysis, indent=2)[:500]}
-
-Donne 3 améliorations possibles (une pour performance, une pour qualité, une pour sécurité).
-Format: {{"performance": "...", "qualite": "...", "securite": "..."}}"""
+        """Demande l'avis d'agents spécialisés (1 seul appel LLM, prompt court)."""
+        # Prompt court pour éviter les timeouts
+        prompt = "Donne 3 améliorations: performance, qualité, sécurité. JSON: {\"performance\":\"...\",\"qualite\":\"...\",\"securite\":\"...\"}"
         try:
             response = self._call_llm(prompt)
             import re
@@ -180,18 +176,19 @@ Donne ton avis en 2-3 phrases. Sois spécifique et actionnable."""
         return questions[:5]  # Limiter à 5 questions
 
     def _organize_debats(self, questions: list[str]) -> list:
-        """Organise des débats pour chaque question."""
+        """Organise un seul débat (optimisé)."""
         from vortex.debate import DebateEngine
 
-        debates = []
-        for question in questions:
-            method = self._choose_debate_method(question)
-            # Créer un nouvel engine avec la méthode choisie
-            engine = DebateEngine(method, models=['mimo-v2.5', 'deepseek-v4-flash'])
-            team = engine.create_team(3)
-            result = engine.debate(question, team)
-            debates.append(result)
-        return debates
+        if not questions:
+            return []
+
+        # Un seul débat sur la question la plus importante
+        question = questions[0]
+        method = self._choose_debate_method(question)
+        engine = DebateEngine(method, models=['mimo-v2.5'])
+        team = engine.create_team(1)  # 1 seul agent
+        result = engine.debate(question, team)
+        return [result]
 
     def _choose_debate_method(self, question: str) -> str:
         """Choisit la méthode de débat appropriée."""
@@ -262,9 +259,33 @@ Donne ton avis en 2-3 phrases. Sois spécifique et actionnable."""
     def _call_llm(self, prompt: str) -> str:
         """Appelle le LLM pour obtenir une réponse."""
         try:
-            from vortex.llm_factory import create_client
-            client = create_client(self.manifest)
-            return client.complete(prompt) or "No response"
+            # Pour les appels rapides (specialists, debates), utiliser litellm directement
+            # Pour l'exécution de code, utiliser Claude Code
+            import litellm
+            import os
+
+            model = self.manifest.optimizer.model or "mimo-v2.5"
+            if self.manifest.optimizer.model_proxy and not model.startswith("openai/"):
+                model = f"openai/{model}"
+
+            kwargs = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 500,
+            }
+
+            if self.manifest.optimizer.model_proxy:
+                kwargs["api_base"] = self.manifest.optimizer.model_proxy
+                if not os.environ.get("OPENAI_API_KEY"):
+                    kwargs["api_key"] = "not-needed"
+
+            response = litellm.completion(**kwargs)
+            msg = response.choices[0].message
+            content = msg.content or ""
+            if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
+                content = msg.reasoning_content
+            return content or "No response"
         except Exception as e:
             logger.warning("LLM call failed: %s", e)
             return f"[Error: {e}]"

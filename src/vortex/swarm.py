@@ -99,14 +99,15 @@ class SwarmExploration:
     def _generate_change_via_llm(self, agent: SwarmAgent) -> dict | None:
         """Use LLM to generate a real change."""
         try:
-            import litellm
-            import os
+            from vortex.llm_factory import LLMClient
 
             prompt = f"""You are a {agent.specialization} specialist.
 Generate ONE specific optimization change for a Python project.
 Output ONLY a JSON object: {{"file": "path/to/file.py", "description": "specific change"}}
 Be specific and actionable."""
 
+            # Use litellm directly for speed
+            import litellm
             model = "openai/mimo-v2.5"
             kwargs = {
                 "model": model,

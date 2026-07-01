@@ -405,12 +405,8 @@ class ConstraintGates:
     def _check_semantics(self, execution: ExecutionResult) -> GateCheck:
         """Check semantic preservation using LLM."""
         try:
-            import litellm
-            import os
-            import json
-
-            files = execution.files_changed[:5]  # Limit to 5 files
-            diffs = execution.diff[:2000]  # Limit diff size
+            files = execution.files_changed[:5]
+            diffs = execution.diff[:2000]
 
             prompt = f"""You are a code reviewer. Check if these changes preserve semantic behavior.
 
@@ -420,18 +416,19 @@ Diff preview:
 
 Does this change preserve the original behavior? Answer ONLY "yes" or "no" with a brief reason."""
 
-            model = "openai/deepseek-v4-flash"
-            kwargs = {
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3,
-                "max_tokens": 100,
-            }
-            kwargs["api_base"] = "http://192.168.31.59:4000/v1"
-            if not os.environ.get("OPENAI_API_KEY"):
-                kwargs["api_key"] = "not-needed"
+            # Use the manifest's LLM client for semantic check
+            from vortex.llm_factory import create_client
+            client = create_client(self.manifest)
+            content = client.complete(prompt)
 
-            response = litellm.completion(**kwargs)
+            # Extract yes/no from the response
+            content_lower = content.lower()
+            passed = "yes" in content_lower or "conserve" in content_lower or "preserve" in content_lower
+            return GateCheck(
+                gate_name="semantic_preservation",
+                passed=passed,
+                reason=content[:200] if content else "No response from LLM",
+            )
             msg = response.choices[0].message
             content = msg.content or ""
             if not content and hasattr(msg, 'reasoning_content') and msg.reasoning_content:
